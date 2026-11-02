@@ -135,6 +135,95 @@ can_gas |>
 # This draws a smooth curve through and makes it much easier to see the general direction in the plot.
 
 
+# Part 3
+
+# 3.1a
+
+# The seasonal swings do not seem to clearly grow with the level of the series. Although they grow 
+# when comparing [1960-1970] with [1980-1990] (larger swings after 1980), they revert back and become
+# smaller after 1995. With the swings growing and then shrinking, we cannot say that it grows with the level.
+
+# 3.1b
+can_gas <- can_gas |>
+  mutate(log_volume = log(Volume))
+
+can_gas |>
+  autoplot(log_volume) +
+  labs(
+    title = "Log of Canadian Gas Production",
+    x = NULL, y = "log(Volume)"
+  ) +
+  theme_minimal()
+
+# The growth rate in the early portion of the series now looks steeper compared to the rest of the timeline.
+# The seasonal swings now appear largest in the 1960s and get smaller over time.
+# I believe that logs aren't a good idea for tis graph as the swings still aren't constant and 
+# the long transofmation may have over-corrected the swings.
+
+# 3.1c 
+retail_nsa <- retail_ts |>
+  filter(series_id == "RSAFSNA") |>
+  mutate(log_sales = log(sales))
+
+retail_nsa |>
+  autoplot(sales) +
+  labs(title = "NSA Retail Sales (Level)", x = NULL, y = "Millions of dollars") +
+  theme_minimal()
+
+retail_nsa |>
+  autoplot(log_sales) +
+  labs(title = "NSA Retail Sales (Log)", x = NULL, y = "log(sales)") +
+  theme_minimal()
+
+# The case for using logs in this series is stronger than for can_gas.  When inspecting the plot 
+# after the log transformation, the swings are much more consistent, growing steadily with the level.
+# can_gas is much more variable in the swings even after a log transformation.
+
+# 3.2 
+#3.2a
+can_gas <- can_gas |>
+  mutate(
+    growth_direct  = 100 * difference(Volume) / lag(Volume),
+    growth_logdiff = 100 * difference(log_volume)
+  )
+
+can_gas |>
+  autoplot(growth_direct) +
+  labs(title = "Month-over-Month Growth in Canadian Gas Production",
+       x = NULL, y = "Growth rate (%)") +
+  theme_minimal()
+
+can_gas <- can_gas |>
+  mutate(growth_gap = abs(growth_direct - growth_logdiff))
+
+can_gas |>
+  autoplot(growth_gap) +
+  labs(title = "Gap Between Direct and Log-Difference Growth Rates",
+       x = NULL, y = "Absolute difference (percentage points)") +
+  theme_minimal()
+
+# Growth rates swing a lot due to the seasonality. I think the log difference approximation is good
+# for regular months but suffers for the months with larger swings. This is expected as it should
+# be accurate when growth rates are small.
+
+# 3.3
+retail_ts <- retail_ts |>
+  group_by_key() |>
+  mutate(growth_mom = 100 * difference(log(sales))) |>
+  ungroup()
+
+retail_ts |>
+  autoplot(growth_mom) +
+  labs(
+    title = "Month-over-Month Growth: SA vs. NSA Retail Sales",
+    x = NULL, y = "Growth rate (%)", color = NULL
+  ) +
+  theme_minimal()
+
+# The month over month growth rate of NSA is extremely different from the SA series, with NSA being much
+# noisier. The growth rate fluctuates much more, because NSA is dominated by the seasonal pattern, jumping
+# every December and then dipping in January-February. The seasonal pattern from 27.b dominates, showing
+# why seasonally adjusted data is so important. 
 
 
 
