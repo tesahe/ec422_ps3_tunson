@@ -368,6 +368,73 @@ can_gas_fit |>
 # The Ljung-Box test reports Q = 7774, p-value = 0. At the 5% level we reject the null hypothesis and
 # conclude that the residuals are not white noise. 
 
+# Part 5
+
+gas_cv_fc <- can_gas |>
+  select(Month, Volume) |>
+  stretch_tsibble(.init = 240, .step = 1) |>
+  model(snaive = SNAIVE(Volume),
+        tslm   = TSLM(log(Volume) ~ trend() + season())) |>
+  forecast(h = 1)
+
+gas_cv_fc |>
+  accuracy(can_gas, measures = list(MAE = MAE, RMSE = RMSE))
+
+# dates
+gas_cv_fc |>
+  as_tibble() |>
+  filter(Month %in% can_gas$Month) |>
+  group_by(.model) |>
+  summarize(first = min(Month), last = max(Month), n_forecasts = n())
+
+# The date of the first forecast is January 1980. The date of the last is Feb 2005.
+# For snaive, MAE = 0.562, RMSE = 0.702.
+# For tslm, MAE = 4.01, RMSE = 4.36. 
+# The seasonal random walk is much more accurate with significantly lower errors. Both metrics agree.
+# Seasonal random walk is much more accurate because it starts from last year, accurately capturing the
+# current level, while tslm starts back from 1960.
+
+# 5.2 
+errs <- gas_cv_fc |>
+  as_tibble() |>
+  left_join(as_tibble(can_gas) |> select(Month, actual = Volume),
+            by = "Month") |>
+  mutate(e = actual - .mean) |>
+  select(Month, .model, e) |>
+  pivot_wider(names_from = .model, values_from = e) |>
+  na.omit()
+
+forecast::dm.test(errs$snaive, errs$tslm, h = 1, power = 1)
+
+# The DM stat is -31.278, with a p-value < 2.2e-16, close to 0. 
+# We reject the null hypothesis that the two models are equally accurate and conclude that with 
+# a negative sign DM value, Seasonal Random Walk has smaller errors and therefore forecasts
+# better than TSLM. 
+
+# 5.3
+
+gas_cv_fc_rolling <- can_gas |>
+  select(Month, Volume) |>
+  slide_tsibble(.size = 240, .step = 1) |>
+  model(snaive = SNAIVE(Volume),
+        tslm   = TSLM(log(Volume) ~ trend() + season())) |>
+  forecast(h = 1)
+
+gas_cv_fc_rolling |>
+  accuracy(can_gas, measures = list(MAE = MAE, RMSE = RMSE))
+
+# With a rolling window, for Seasonal Random Walk MAE = 0.562 and RMSE = 0.702.
+# For TSLM, MAE = 2.09, RMSE = 2.42.
+# TSLM changed a lot with a rolling window with MAE dropping significantly from 4.01 to 2.09.
+# Seasonal Random walk didn't change at all, which is expected because it only uses the most recent 
+# seasonal value. 
+# Overall, rolling window is very important in this case for TSLM as it better adjusts to the 
+# more recent slope and level from recent growth, instead of fitting to the older values in 1960s. 
+# However, Seasonal Random Walk is still much more accurate even after using a rolling window.
+
+
+
+
 
 
 
